@@ -190,10 +190,7 @@
     }
 
     input[type=password],
-    input[type=text],
-    input[type=number],
-    select,
-    textarea {
+    input[type=text] {
       width: 100%;
       background: var(--surface2);
       border: 1px solid var(--border);
@@ -206,72 +203,8 @@
       transition: border-color .2s;
     }
 
-    textarea {
-      min-height: 100px;
-      resize: vertical;
-      line-height: 1.45;
-    }
-
-    input:focus,
-    select:focus,
-    textarea:focus {
+    input:focus {
       border-color: var(--accent)
-    }
-
-    .form-grid {
-      display: grid;
-      grid-template-columns: 90px 1fr;
-      gap: 10px;
-    }
-
-    .challenge-list {
-      display: grid;
-      gap: 10px;
-      margin-top: 16px;
-    }
-
-    .challenge-item {
-      border: 1px solid rgba(30, 58, 95, .6);
-      border-radius: 10px;
-      padding: 12px;
-      background: rgba(17, 31, 54, .45);
-    }
-
-    .challenge-top {
-      display: flex;
-      justify-content: space-between;
-      gap: 10px;
-      align-items: flex-start;
-      margin-bottom: 8px;
-    }
-
-    .challenge-title {
-      font-weight: 700;
-      color: var(--text);
-      line-height: 1.25;
-    }
-
-    .challenge-meta {
-      color: var(--muted);
-      font-size: .72rem;
-      margin-top: 3px;
-    }
-
-    .challenge-desc {
-      color: var(--muted);
-      font-size: .78rem;
-      line-height: 1.45;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-    }
-
-    .challenge-form-status {
-      min-height: 18px;
-      color: var(--muted);
-      font-size: .78rem;
-      margin-top: 10px;
     }
 
     .err-msg {
@@ -705,61 +638,6 @@
 
       <div style="display:flex;flex-direction:column;gap:14px">
         <div class="card">
-          <div class="card-header"><span>⚙️</span>
-            <h2>MANAJEMEN SESI</h2>
-          </div>
-          <div class="card-body">
-            <div class="session-info">
-              <div class="info-row">
-                <span class="info-label">Sesi Aktif Sekarang</span>
-                <span class="info-value" id="msActiveSession">—</span>
-              </div>
-              <div style="margin-top:12px">
-                <input type="text" id="newSessionInput" placeholder="contoh: Sesi-2" style="margin-bottom:8px">
-                <button class="btn btn-primary"
-                  style="width:100%; background: var(--green); color: #000; border: none; font-weight: 700;"
-                  onclick="mulaiSesiBaru()">▶ Mulai Sesi Baru</button>
-              </div>
-              <p style="font-size:.72rem; color: var(--red); margin-top:8px; line-height:1.2; font-weight: 600;">
-                ⚠️ Mengganti sesi akan mereset semua data pemain di ESP32
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="card-header"><span>#</span>
-            <h2>MANAJEMEN SOAL</h2>
-          </div>
-          <div class="card-body">
-            <form id="challengeForm" onsubmit="saveChallenge(event)">
-              <div class="form-grid">
-                <input type="number" id="chId" min="1" max="6" placeholder="ID" required>
-                <select id="chCategory" required>
-                  <option value="Pengetahuan">Pengetahuan</option>
-                  <option value="Kriptografi">Kriptografi</option>
-                  <option value="Steganografi">Steganografi</option>
-                  <option value="Web Exploitation">Web Exploitation</option>
-                  <option value="Network">Network</option>
-                </select>
-              </div>
-              <input type="text" id="chTitle" placeholder="Judul soal" required>
-              <textarea id="chDescription" placeholder="Deskripsi soal..." required></textarea>
-              <input type="number" id="chPoints" min="1" max="999" placeholder="Poin" required>
-              <input type="text" id="chFlag" placeholder="Flag plaintext, contoh: CTF{jawaban}">
-              <div style="display:flex;gap:10px;flex-wrap:wrap">
-                <button class="btn btn-primary" type="submit">Simpan Soal</button>
-                <button class="btn btn-ghost" type="button" onclick="clearChallengeForm()">Bersihkan</button>
-              </div>
-              <div class="challenge-form-status" id="challengeFormStatus"></div>
-            </form>
-            <div class="challenge-list" id="challengeList">
-              <div style="color:var(--muted);font-size:.82rem;text-align:center;padding:14px">Memuat soal...</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="card">
           <div class="card-header"><span>📋</span>
             <h2>INFO SESI</h2>
           </div>
@@ -843,8 +721,8 @@
   <script>
     const ADMIN_PW_HASH = 'ctf@admin2026';
     const SESSION_NAME = 'Sesi-1';
-    const DEFAULT_CHALLENGE_NAMES = ['Pengetahuan', 'Caesar Cipher', 'Base64', 'Steganografi', 'SQL Injection', 'Port HTTPS'];
-    const CHALLENGE_CATEGORIES = ['Pengetahuan', 'Kriptografi', 'Steganografi', 'Web Exploitation', 'Network'];
+    const CHALLENGE_NAMES = ['Pengetahuan', 'Caesar Cipher', 'Base64', 'Steganografi', 'SQL Injection', 'Port HTTPS'];
+    const MAX_SCORE = 150;
     const AUTH_STORAGE_KEY = 'bytearena.instructor.auth';
     const AUTH_TTL_MS = 12 * 60 * 60 * 1000;
     const UNIX_TS_THRESHOLD = 1000000000;
@@ -862,10 +740,6 @@
     let db = null;
     let sessionName = SESSION_NAME;
     let players = {};
-    let challenges = {};
-    let challengeList = [];
-    let challengeNames = DEFAULT_CHALLENGE_NAMES.slice();
-    let maxScore = 150;
     let sessionStartTs = Date.now();
     let sessionStartRaw = null;
     let lastSyncRaw = null;
@@ -880,7 +754,7 @@
           session: sessionName,
           expiresAt: Date.now() + AUTH_TTL_MS
         }));
-      } catch { }
+      } catch {}
     }
 
     function hasSavedInstructorAuth() {
@@ -888,11 +762,10 @@
         const raw = localStorage.getItem(AUTH_STORAGE_KEY);
         if (!raw) return false;
         const data = JSON.parse(raw);
-        if (data.expiresAt <= Date.now()) {
+        if (data.session !== sessionName || data.expiresAt <= Date.now()) {
           clearInstructorAuth();
           return false;
         }
-        if (data.session) sessionName = data.session;
         return true;
       } catch {
         clearInstructorAuth();
@@ -903,32 +776,17 @@
     function clearInstructorAuth() {
       try {
         localStorage.removeItem(AUTH_STORAGE_KEY);
-      } catch { }
+      } catch {}
     }
 
-    async function showDashboard() {
+    function showDashboard() {
       document.getElementById('loginOverlay').style.display = 'none';
       document.getElementById('mainHeader').style.display = 'flex';
       document.getElementById('dashMain').style.display = 'grid';
-
-      // Baca sesi aktif dari Firebase
-      try {
-        const snap = await db.ref('/config/activeSession').get();
-        if (snap.exists()) {
-          sessionName = snap.val();
-        }
-      } catch (e) {
-        console.error("Gagal baca activeSession:", e);
-      }
-
       document.getElementById('siName').textContent = sessionName;
-      document.getElementById('msActiveSession').textContent = sessionName;
       document.getElementById('sessionLabel').textContent = `Sesi: ${sessionName}`;
       document.getElementById('siStatus').textContent = '⏳ Menghubungkan...';
-
-      // Pastikan listener berjalan dengan sessionName yang benar
-      startListening();
-
+      // renderChallengeStats() dihapus dari sini
       startClock();
     }
 
@@ -965,10 +823,15 @@
 
         db = firebase.database(app);
 
+        if (!listenersStarted) {
+          startListening();
+          listenersStarted = true;
+        }
+
         return true;
       } catch (e) {
         document.getElementById('loginErr').textContent = 'Gagal inisialisasi Firebase: ' + e.message;
-        return false;
+      return false;
       }
     }
 
@@ -997,13 +860,6 @@
     }
 
     function startListening() {
-      // Lepas listener lama jika ada
-      db.ref(`/sessions`).off();
-      db.ref(`/sessions/${sessionName}/players`).off();
-      db.ref(`/sessions/${sessionName}/info`).off();
-      db.ref(`/sessions/${sessionName}/lastSync`).off();
-      db.ref('/challenges').off();
-
       const ref = db.ref(`/sessions/${sessionName}/players`);
 
       ref.on('value', snap => {
@@ -1021,15 +877,6 @@
           playerSnapshotReady = true;
         }
         updateSessionInfo();
-      });
-
-      db.ref('/challenges').on('value', snap => {
-        challenges = snap.val() || {};
-        refreshChallengeDerivedData();
-        renderChallengeManager();
-        renderChallengeStats();
-        renderLeaderboard();
-        updateKPIs();
       });
 
       db.ref(`/sessions/${sessionName}/info`).on('value', snap => {
@@ -1051,7 +898,6 @@
         }
       });
 
-      db.ref('.info/connected').off();
       db.ref('.info/connected').on('value', snap => {
         const connected = !!snap.val();
         updateBadge(connected);
@@ -1065,132 +911,10 @@
       b.className = 'badge ' + (ok ? 'badge-live' : 'badge-offline');
     }
 
-    function refreshChallengeDerivedData() {
-      challengeList = Object.entries(challenges)
-        .map(([id, data]) => ({
-          id: Number(id),
-          category: data?.category || 'Pengetahuan',
-          title: data?.title || `Challenge ${id}`,
-          description: data?.description || '',
-          points: Number(data?.points || 0),
-          flagHash: data?.flagHash || ''
-        }))
-        .filter(c => Number.isInteger(c.id) && c.id >= 1 && c.id <= 6)
-        .sort((a, b) => a.id - b.id);
-
-      challengeNames = Array.from({ length: 6 }, (_, i) => {
-        const found = challengeList.find(c => c.id === i + 1);
-        return found?.title || DEFAULT_CHALLENGE_NAMES[i] || `Challenge ${i + 1}`;
-      });
-
-      maxScore = challengeList.reduce((sum, c) => sum + c.points, 0) || 150;
-    }
-
-    async function sha256Hex(text) {
-      if (!crypto?.subtle) {
-        throw new Error('crypto.subtle tidak tersedia di browser ini.');
-      }
-      const bytes = new TextEncoder().encode(text);
-      const digest = await crypto.subtle.digest('SHA-256', bytes);
-      return Array.from(new Uint8Array(digest))
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
-    }
-
-    function setChallengeFormStatus(msg, type = 'info') {
-      const el = document.getElementById('challengeFormStatus');
-      if (!el) return;
-      el.textContent = msg;
-      el.style.color = type === 'error' ? 'var(--red)' : type === 'success' ? 'var(--green)' : 'var(--muted)';
-    }
-
-    function renderChallengeManager() {
-      const list = document.getElementById('challengeList');
-      if (!list) return;
-
-      if (!challengeList.length) {
-        list.innerHTML = '<div style="color:var(--muted);font-size:.82rem;text-align:center;padding:14px">Belum ada soal di Firebase.</div>';
-        return;
-      }
-
-      list.innerHTML = challengeList.map(c => `
-        <div class="challenge-item">
-          <div class="challenge-top">
-            <div>
-              <div class="challenge-title">${c.id}. ${esc(c.title)}</div>
-              <div class="challenge-meta">${esc(c.category)} &middot; ${c.points} poin &middot; hash ${esc(c.flagHash.slice(0, 10))}...</div>
-            </div>
-            <button class="btn btn-ghost" style="font-size:.72rem;padding:5px 10px" onclick="editChallenge(${c.id})">Edit</button>
-          </div>
-          <div class="challenge-desc">${esc(c.description)}</div>
-        </div>
-      `).join('');
-    }
-
-    function editChallenge(id) {
-      const c = challengeList.find(item => item.id === Number(id));
-      if (!c) return;
-
-      document.getElementById('chId').value = c.id;
-      document.getElementById('chCategory').value = CHALLENGE_CATEGORIES.includes(c.category) ? c.category : 'Pengetahuan';
-      document.getElementById('chTitle').value = c.title;
-      document.getElementById('chDescription').value = c.description;
-      document.getElementById('chPoints').value = c.points;
-      document.getElementById('chFlag').value = '';
-      setChallengeFormStatus('Mode edit: kosongkan flag jika jawaban tidak diganti.');
-    }
-
-    function clearChallengeForm() {
-      document.getElementById('challengeForm').reset();
-      setChallengeFormStatus('');
-    }
-
-    async function saveChallenge(event) {
-      event.preventDefault();
-
-      const id = Number(document.getElementById('chId').value);
-      const category = document.getElementById('chCategory').value;
-      const title = document.getElementById('chTitle').value.trim();
-      const description = document.getElementById('chDescription').value.trim();
-      const points = Number(document.getElementById('chPoints').value);
-      const flagPlain = document.getElementById('chFlag').value.trim();
-      const existing = challenges[String(id)] || {};
-
-      if (!Number.isInteger(id) || id < 1 || id > 6) {
-        setChallengeFormStatus('ID harus antara 1 sampai 6.', 'error');
-        return;
-      }
-      if (!title || !description || !points || points < 1) {
-        setChallengeFormStatus('Judul, deskripsi, dan poin wajib diisi.', 'error');
-        return;
-      }
-      if (!flagPlain && !existing.flagHash) {
-        setChallengeFormStatus('Flag plaintext wajib diisi untuk soal baru.', 'error');
-        return;
-      }
-
-      try {
-        setChallengeFormStatus('Membuat hash SHA-256 dan menyimpan...');
-        const flagHash = flagPlain ? await sha256Hex(flagPlain) : existing.flagHash;
-        await db.ref(`/challenges/${id}`).set({
-          category,
-          title,
-          description,
-          points,
-          flagHash
-        });
-
-        document.getElementById('chFlag').value = '';
-        setChallengeFormStatus(`Soal #${id} berhasil disimpan.`, 'success');
-        addLog(`Instruktur menyimpan soal #${id}`, 'join');
-      } catch (e) {
-        setChallengeFormStatus('Gagal menyimpan soal: ' + e.message, 'error');
-      }
-    }
-
     function renderLeaderboard() {
       const sorted = Object.entries(players)
         .map(([name, d]) => ({ name, score: d.score || 0, solved: d.solved || '', ip: d.ip || '', active: d.active !== false }))
+        .filter(p => p.active)
         .sort((a, b) => b.score - a.score);
 
       const tbody = document.getElementById('leaderboardBody');
@@ -1204,7 +928,7 @@
           ? `<span class="rank-badge r${i + 1}">${['🥇', '🥈', '🥉'][i]}</span>`
           : `<span class="rank-badge rn">#${i + 1}</span>`;
 
-        const pct = Math.min(100, (p.score / maxScore) * 100);
+        const pct = Math.min(100, (p.score / MAX_SCORE) * 100);
         const pills = Array.from({ length: 6 }, (_, k) =>
           `<span class="flag-pill ${p.solved[k] === '1' ? 'flag-done' : 'flag-todo'}" title="Ch ${k + 1}">${k + 1}</span>`
         ).join('');
@@ -1212,10 +936,7 @@
         return `<tr>
       <td>${rankHtml}</td>
       <td>
-        <div style="font-weight:600; display:flex; align-items:center; gap:6px">
-          ${esc(p.name)}
-          ${p.active ? '' : '<span style="font-size:0.6rem; background:var(--red); color:#fff; padding:1px 4px; border-radius:4px">OFFLINE</span>'}
-        </div>
+        <div style="font-weight:600">${esc(p.name)}</div>
         <div style="font-size:.7rem;color:var(--muted)">${esc(p.ip)}</div>
         <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
       </td>
@@ -1245,7 +966,7 @@
       const totalFlags = arr.reduce((sum, p) => sum + p.solved.split('').filter(c => c === '1').length, 0);
       document.getElementById('kpiFlags').textContent = totalFlags;
 
-      const maxFlags = arr.length * challengeList.length;
+      const maxFlags = arr.length * 6;
       const completion = maxFlags > 0 ? Math.round((totalFlags / maxFlags) * 100) : 0;
       document.getElementById('siCompletion').textContent = `${completion}%`;
     }
@@ -1255,7 +976,7 @@
       const arr = Object.values(players).filter(p => p.active !== false);
       const totalPlayers = arr.length || 1;
 
-      container.innerHTML = challengeNames.map((name, i) => {
+      container.innerHTML = CHALLENGE_NAMES.map((name, i) => {
         const solved = arr.filter(p => (p.solved || '')[i] === '1').length;
         const pct = Math.round((solved / totalPlayers) * 100);
         return `
@@ -1287,7 +1008,7 @@
         const currSolved = data.solved || '';
         for (let i = 0; i < 6; i++) {
           if (currSolved[i] === '1' && prevSolved[i] !== '1') {
-            addLog(`${name} ✅ solved Challenge ${i + 1} (${challengeNames[i]})`, 'success');
+            addLog(`${name} ✅ solved Challenge ${i + 1} (${CHALLENGE_NAMES[i]})`, 'success');
           }
         }
       });
@@ -1359,7 +1080,7 @@
         .sort((a, b) => b.score - a.score);
 
       const csvCell = value => `"${String(value ?? '').replace(/"/g, '""')}"`;
-      let csv = 'Rank,Nama,Skor,IP,' + challengeNames.join(',') + '\n';
+      let csv = 'Rank,Nama,Skor,IP,' + CHALLENGE_NAMES.join(',') + '\n';
       sorted.forEach((p, i) => {
         const flags = Array.from({ length: 6 }, (_, k) => p.solved[k] === '1' ? 'Solved' : '-');
         csv += `${i + 1},${csvCell(p.name)},${p.score},${csvCell(p.ip)},${flags.join(',')}\n`;
@@ -1403,53 +1124,6 @@
       document.getElementById('resetErr').textContent = '';
       document.getElementById('resetPw').value = '';
       document.getElementById('resetModal').classList.add('active');
-    }
-
-    async function mulaiSesiBaru() {
-      const input = document.getElementById('newSessionInput');
-      const newName = input.value.trim();
-
-      if (!newName) {
-        alert('Nama sesi tidak boleh kosong!');
-        return;
-      }
-      if (newName === sessionName) {
-        alert('Nama sesi sama dengan sesi yang sedang berjalan!');
-        return;
-      }
-
-      if (!confirm(`Yakin ingin mengganti sesi ke [${newName}]? Semua data pemain saat ini akan direset.`)) {
-        return;
-      }
-
-      try {
-        await db.ref('/config/activeSession').set(newName);
-        sessionName = newName;
-
-        // Update UI
-        document.getElementById('siName').textContent = sessionName;
-        document.getElementById('msActiveSession').textContent = sessionName;
-        document.getElementById('sessionLabel').textContent = `Sesi: ${sessionName}`;
-
-        saveInstructorAuth();
-
-        // Reset state local
-        playerSnapshotReady = false;
-        players = {};
-        logItems = [];
-        document.getElementById('activityLog').innerHTML = '';
-
-        renderLeaderboard();
-        updateKPIs();
-
-        // Restart listen ke path baru
-        startListening();
-
-        alert(`✅ Sesi [${newName}] dimulai! ESP32 akan update dalam 10 detik.`);
-        input.value = '';
-      } catch (e) {
-        alert('Gagal mengganti sesi: ' + e.message);
-      }
     }
 
     async function doReset() {
