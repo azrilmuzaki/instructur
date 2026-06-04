@@ -639,12 +639,12 @@
       <div style="display:flex;flex-direction:column;gap:14px">
         <div class="card">
           <div class="card-header"><span>📋</span>
-            <h2>INFO SESI</h2>
+            <h2>INFO CTF</h2>
           </div>
           <div class="card-body">
-            <div class="session-info" id="sessionInfo">
+            <!-- <div class="session-info" id="sessionInfo">
               <div class="info-row"><span class="info-label">Sesi</span><span class="info-value" id="siName">—</span>
-              </div>
+              </div> -->
               <div class="info-row"><span class="info-label">Status Firebase</span><span class="info-value"
                   id="siStatus">—</span></div>
               <div class="info-row"><span class="info-label">Sync Terakhir</span><span class="info-value"
@@ -784,7 +784,7 @@
       document.getElementById('mainHeader').style.display = 'flex';
       document.getElementById('dashMain').style.display = 'grid';
       document.getElementById('siName').textContent = sessionName;
-      document.getElementById('sessionLabel').textContent = `Sesi: ${sessionName}`;
+      // document.getElementById('sessionLabel').textContent = `Sesi: ${sessionName}`;
       document.getElementById('siStatus').textContent = '⏳ Menghubungkan...';
       // renderChallengeStats() dihapus dari sini
       startClock();
