@@ -639,12 +639,12 @@
       <div style="display:flex;flex-direction:column;gap:14px">
         <div class="card">
           <div class="card-header"><span>📋</span>
-            <h2>INFO CTF</h2>
+            <h2>INFO SESI</h2>
           </div>
           <div class="card-body">
-            <!-- <div class="session-info" id="sessionInfo">
+            <div class="session-info" id="sessionInfo">
               <div class="info-row"><span class="info-label">Sesi</span><span class="info-value" id="siName">—</span>
-              </div> -->
+              </div>
               <div class="info-row"><span class="info-label">Status Firebase</span><span class="info-value"
                   id="siStatus">—</span></div>
               <div class="info-row"><span class="info-label">Sync Terakhir</span><span class="info-value"
@@ -754,7 +754,7 @@
           session: sessionName,
           expiresAt: Date.now() + AUTH_TTL_MS
         }));
-      } catch {}
+      } catch { }
     }
 
     function hasSavedInstructorAuth() {
@@ -776,7 +776,7 @@
     function clearInstructorAuth() {
       try {
         localStorage.removeItem(AUTH_STORAGE_KEY);
-      } catch {}
+      } catch { }
     }
 
     function showDashboard() {
@@ -784,7 +784,7 @@
       document.getElementById('mainHeader').style.display = 'flex';
       document.getElementById('dashMain').style.display = 'grid';
       document.getElementById('siName').textContent = sessionName;
-      // document.getElementById('sessionLabel').textContent = `Sesi: ${sessionName}`;
+      document.getElementById('sessionLabel').textContent = `Sesi: ${sessionName}`;
       document.getElementById('siStatus').textContent = '⏳ Menghubungkan...';
       // renderChallengeStats() dihapus dari sini
       startClock();
@@ -831,7 +831,7 @@
         return true;
       } catch (e) {
         document.getElementById('loginErr').textContent = 'Gagal inisialisasi Firebase: ' + e.message;
-      return false;
+        return false;
       }
     }
 
@@ -913,13 +913,18 @@
 
     function renderLeaderboard() {
       const sorted = Object.entries(players)
-        .map(([name, d]) => ({ name, score: d.score || 0, solved: d.solved || '', ip: d.ip || '', active: d.active !== false }))
-        .filter(p => p.active)
+        .map(([name, d]) => ({
+          name,
+          score: d.score || 0,
+          solved: d.solved || '',
+          ip: d.ip || '',
+          active: d.active !== false
+        }))
         .sort((a, b) => b.score - a.score);
 
       const tbody = document.getElementById('leaderboardBody');
       if (!sorted.length) {
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:30px">Belum ada pemain...</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:30px">Menunggu data...</td></tr>';
         return;
       }
 
@@ -933,10 +938,13 @@
           `<span class="flag-pill ${p.solved[k] === '1' ? 'flag-done' : 'flag-todo'}" title="Ch ${k + 1}">${k + 1}</span>`
         ).join('');
 
-        return `<tr>
+        const rowStyle = p.active ? '' : 'opacity: 0.5; filter: grayscale(0.5);';
+        const activeTag = p.active ? '' : ' <span style="font-size:0.6rem; color:var(--red); border:1px solid var(--red); padding:1px 4px; border-radius:4px; margin-left:4px">OFFLINE</span>';
+
+        return `<tr style="${rowStyle}">
       <td>${rankHtml}</td>
       <td>
-        <div style="font-weight:600">${esc(p.name)}</div>
+        <div style="font-weight:600">${esc(p.name)}${activeTag}</div>
         <div style="font-size:.7rem;color:var(--muted)">${esc(p.ip)}</div>
         <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
       </td>
@@ -947,37 +955,39 @@
     }
 
     function updateKPIs() {
-      const arr = Object.entries(players)
-        .map(([name, data]) => ({
-          name,
-          score: data.score || 0,
-          solved: data.solved || '',
-          active: data.active !== false
-        }))
-        .filter(p => p.active);
+      const allPlayers = Object.entries(players).map(([name, data]) => ({
+        name,
+        score: data.score || 0,
+        solved: data.solved || '',
+        active: data.active !== false
+      }));
 
-      document.getElementById('kpiPlayers').textContent = arr.length;
-      document.getElementById('siPlayers').textContent = arr.length;
+      const activePlayers = allPlayers.filter(p => p.active);
 
-      const top = arr.reduce((best, current) => current.score > best.score ? current : best, { name: '—', score: 0 });
+      document.getElementById('kpiPlayers').textContent = activePlayers.length;
+      document.getElementById('siPlayers').textContent = activePlayers.length;
+
+      // Top Score tetap diambil dari semua pemain (walaupun offline)
+      const top = allPlayers.reduce((best, current) => current.score > best.score ? current : best, { name: '—', score: 0 });
       document.getElementById('kpiTopScore').textContent = top.score || 0;
       document.getElementById('kpiTopName').textContent = top.name || '—';
 
-      const totalFlags = arr.reduce((sum, p) => sum + p.solved.split('').filter(c => c === '1').length, 0);
+      // Total Flag dihitung dari semua pemain
+      const totalFlags = allPlayers.reduce((sum, p) => sum + p.solved.split('').filter(c => c === '1').length, 0);
       document.getElementById('kpiFlags').textContent = totalFlags;
 
-      const maxFlags = arr.length * 6;
+      const maxFlags = allPlayers.length * 6;
       const completion = maxFlags > 0 ? Math.round((totalFlags / maxFlags) * 100) : 0;
       document.getElementById('siCompletion').textContent = `${completion}%`;
     }
 
     function renderChallengeStats() {
       const container = document.getElementById('challengeStats');
-      const arr = Object.values(players).filter(p => p.active !== false);
-      const totalPlayers = arr.length || 1;
+      const allPlayers = Object.values(players);
+      const totalPlayers = allPlayers.length || 1;
 
       container.innerHTML = CHALLENGE_NAMES.map((name, i) => {
-        const solved = arr.filter(p => (p.solved || '')[i] === '1').length;
+        const solved = allPlayers.filter(p => (p.solved || '')[i] === '1').length;
         const pct = Math.round((solved / totalPlayers) * 100);
         return `
       <div style="margin-bottom:12px">
@@ -1138,8 +1148,21 @@
       }
 
       try {
+        // 1. Hapus di Firebase
         await db.ref(`/sessions/${sessionName}/players`).remove();
         await db.ref(`/sessions/${sessionName}/lastSync`).remove();
+
+        // 2. Coba beritahu ESP32 (jika terhubung ke WiFi ByteArena)
+        try {
+          await fetch('http://192.168.4.1/api/admin/reset', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: pw })
+          });
+        } catch (err) {
+          console.warn("Gagal menghubungi ESP32 secara langsung. Pastikan Anda terhubung ke WiFi ByteArena jika ingin mereset memori ESP32 secara instan.");
+        }
+
         players = {};
         logItems = [];
         renderLeaderboard();
@@ -1148,6 +1171,2389 @@
         addLog('Sesi direset oleh instruktur', 'join');
         addLog('Sesi baru dimulai', 'join');
         document.getElementById('resetModal').classList.remove('active');
+        alert('Sesi berhasil direset!');
+      } catch (e) {
+        document.getElementById('resetErr').textContent = 'Gagal: ' + e.message;
+      }
+    }
+
+    function esc(s) {
+      return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    if (hasSavedInstructorAuth()) {
+      if (initFirebase()) showDashboard();
+    } else {
+      document.getElementById('adminPw').focus();
+    }
+  </script>
+</body>
+
+</html><!DOCTYPE html>
+<html lang="id">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>CTF-ESP32 | Instruktur Dashboard</title>
+
+  <!-- Firebase SDK v9 (compat mode) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0
+    }
+
+    :root {
+      --bg: #050d1a;
+      --surface: #0c1526;
+      --surface2: #111f36;
+      --border: #1e3a5f;
+      --accent: #00d4ff;
+      --accent2: #7c3aed;
+      --green: #10b981;
+      --red: #ef4444;
+      --yellow: #f59e0b;
+      --orange: #f97316;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --font: 'Segoe UI', system-ui, sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      min-height: 100vh
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(ellipse at top left, rgba(0, 212, 255, .06) 0%, transparent 60%),
+        radial-gradient(ellipse at bottom right, rgba(124, 58, 237, .06) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    header {
+      background: rgba(5, 13, 26, .95);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 28px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .logo {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: 1px
+    }
+
+    .logo em {
+      color: var(--accent2);
+      font-style: normal
+    }
+
+    .badge {
+      padding: 3px 12px;
+      border-radius: 20px;
+      font-size: .72rem;
+      font-weight: 600;
+      letter-spacing: .5px;
+      text-transform: uppercase;
+    }
+
+    .badge-live {
+      background: rgba(16, 185, 129, .15);
+      color: var(--green);
+      border: 1px solid rgba(16, 185, 129, .3)
+    }
+
+    .badge-offline {
+      background: rgba(239, 68, 68, .15);
+      color: var(--red);
+      border: 1px solid rgba(239, 68, 68, .3)
+    }
+
+    .header-actions {
+      margin-left: auto;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap
+    }
+
+    .btn {
+      padding: 8px 18px;
+      border-radius: 8px;
+      font-size: .82rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all .2s;
+      letter-spacing: .3px;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #000
+    }
+
+    .btn-primary:hover {
+      background: #00bcd4
+    }
+
+    .btn-danger {
+      background: rgba(239, 68, 68, .15);
+      color: var(--red);
+      border: 1px solid rgba(239, 68, 68, .3)
+    }
+
+    .btn-danger:hover {
+      background: var(--red);
+      color: #fff
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border)
+    }
+
+    .btn-ghost:hover {
+      border-color: var(--accent);
+      color: var(--accent)
+    }
+
+    main {
+      position: relative;
+      z-index: 1;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px 20px;
+      display: grid;
+      gap: 20px
+    }
+
+    #loginOverlay {
+      position: fixed;
+      inset: 0;
+      z-index: 999;
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .login-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 40px;
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+    }
+
+    .login-box h2 {
+      font-size: 1.5rem;
+      color: var(--accent);
+      margin-bottom: 8px
+    }
+
+    .login-box p {
+      color: var(--muted);
+      margin-bottom: 24px;
+      font-size: .9rem
+    }
+
+    input[type=password],
+    input[type=text] {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: .9rem;
+      outline: none;
+      margin-bottom: 12px;
+      transition: border-color .2s;
+    }
+
+    input:focus {
+      border-color: var(--accent)
+    }
+
+    .err-msg {
+      color: var(--red);
+      font-size: .8rem;
+      margin-top: 8px;
+      min-height: 18px
+    }
+
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px
+    }
+
+    @media(max-width:800px) {
+      .kpi-row {
+        grid-template-columns: repeat(2, 1fr)
+      }
+    }
+
+    .kpi {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      transition: border-color .2s;
+    }
+
+    .kpi:hover {
+      border-color: var(--accent)
+    }
+
+    .kpi-icon {
+      font-size: 1.6rem
+    }
+
+    .kpi-value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--accent)
+    }
+
+    .kpi-label {
+      font-size: .72rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1px
+    }
+
+    .kpi-delta {
+      font-size: .75rem;
+      color: var(--green)
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: 20px
+    }
+
+    @media(max-width:1000px) {
+      .grid-2 {
+        grid-template-columns: 1fr
+      }
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden
+    }
+
+    .card-header {
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface2);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .card-header h2 {
+      font-size: .9rem;
+      font-weight: 600;
+      color: var(--accent);
+      letter-spacing: .8px
+    }
+
+    .card-body {
+      padding: 20px
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .85rem
+    }
+
+    th {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--muted);
+      font-weight: 600;
+      font-size: .75rem;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+    }
+
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(30, 58, 95, .4)
+    }
+
+    tr:last-child td {
+      border-bottom: none
+    }
+
+    tr:hover td {
+      background: rgba(0, 212, 255, .03)
+    }
+
+    .rank-badge {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: .75rem;
+      font-weight: 700;
+    }
+
+    .r1 {
+      background: linear-gradient(135deg, #ffd700, #ffb300);
+      color: #000
+    }
+
+    .r2 {
+      background: linear-gradient(135deg, #c0c0c0, #a0a0a0);
+      color: #000
+    }
+
+    .r3 {
+      background: linear-gradient(135deg, #cd7f32, #b8651a);
+      color: #fff
+    }
+
+    .rn {
+      background: var(--border);
+      color: var(--muted);
+      font-size: .7rem
+    }
+
+    .progress-bar {
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      margin-top: 4px
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: 2px;
+      transition: width .6s
+    }
+
+    .flag-pills {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap
+    }
+
+    .flag-pill {
+      width: 22px;
+      height: 22px;
+      border-radius: 4px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: .65rem;
+      font-weight: 700;
+    }
+
+    .flag-done {
+      background: rgba(16, 185, 129, .2);
+      color: var(--green);
+      border: 1px solid rgba(16, 185, 129, .4)
+    }
+
+    .flag-todo {
+      background: rgba(30, 58, 95, .4);
+      color: var(--muted);
+      border: 1px solid var(--border)
+    }
+
+    .log-item {
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(30, 58, 95, .3);
+      font-size: .8rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .log-time {
+      color: var(--muted);
+      font-size: .72rem;
+      white-space: nowrap;
+      margin-top: 2px
+    }
+
+    .log-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-top: 4px
+    }
+
+    .log-success {
+      background: var(--green)
+    }
+
+    .log-fail {
+      background: var(--red)
+    }
+
+    .log-join {
+      background: var(--accent)
+    }
+
+    .chart-container {
+      position: relative;
+      height: 180px;
+      margin-top: 10px
+    }
+
+    canvas {
+      width: 100% !important
+    }
+
+    .session-info {
+      display: grid;
+      gap: 10px
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(30, 58, 95, .3);
+      font-size: .85rem;
+    }
+
+    .info-label {
+      color: var(--muted)
+    }
+
+    .info-value {
+      font-weight: 600;
+      color: var(--text)
+    }
+
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 999;
+      background: rgba(0, 0, 0, .8);
+      backdrop-filter: blur(4px);
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .modal-overlay.active {
+      display: flex
+    }
+
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      width: 100%;
+      max-width: 480px;
+      animation: mIn .2s ease;
+    }
+
+    @keyframes mIn {
+      from {
+        transform: scale(.9);
+        opacity: 0
+      }
+
+      to {
+        transform: scale(1);
+        opacity: 1
+      }
+    }
+
+    .modal-header {
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between
+    }
+
+    .modal-body {
+      padding: 20px
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 1.3rem;
+      cursor: pointer
+    }
+
+    pre {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      font-size: .75rem;
+      overflow-x: auto;
+      max-height: 300px;
+      color: var(--text);
+      white-space: pre-wrap;
+    }
+
+    @media(max-width:600px) {
+      header {
+        padding: 12px 16px
+      }
+
+      .kpi-value {
+        font-size: 1.5rem
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id="loginOverlay">
+    <div class="login-box">
+      <div style="font-size:2.5rem;margin-bottom:12px">🔐</div>
+      <h2>CTF-ESP32 Dashboard</h2>
+      <p>Masukkan password admin untuk mengakses dashboard instruktur</p>
+      <input type="password" id="adminPw" placeholder="Password Admin...">
+      <button class="btn btn-primary" style="width:100%" onclick="login()">MASUK</button>
+      <div class="err-msg" id="loginErr"></div>
+      <!-- <div style="margin-top:20px;font-size:.75rem;color:var(--muted)">
+        Default: <code style="color:var(--accent)">ctf@admin2026</code>
+      </div> -->
+    </div>
+  </div>
+
+  <header style="display:none" id="mainHeader">
+    <div class="logo">CTF<em>-</em>ESP32 <span style="font-size:.7rem;color:var(--muted)">Instruktur Dashboard</span>
+    </div>
+    <span class="badge" id="connBadge">⚪ Connecting...</span>
+    <div id="sessionLabel" style="color:var(--muted);font-size:.82rem"></div>
+    <div class="header-actions">
+      <span id="clockDisplay" style="color:var(--muted);font-size:.82rem"></span>
+      <button class="btn btn-ghost" onclick="openExport()">📥 Export CSV</button>
+      <button class="btn btn-danger" onclick="confirmReset()">🔄 Reset Sesi</button>
+      <button class="btn btn-ghost" onclick="logout()">Keluar</button>
+    </div>
+  </header>
+
+  <main id="dashMain" style="display:none">
+    <div class="kpi-row">
+      <div class="kpi">
+        <div class="kpi-icon">👥</div>
+        <div class="kpi-value" id="kpiPlayers">0</div>
+        <div class="kpi-label">Pemain Aktif</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-icon">🏆</div>
+        <div class="kpi-value" id="kpiTopScore" style="color:var(--yellow)">0</div>
+        <div class="kpi-label">Skor Tertinggi</div>
+        <div class="kpi-delta" id="kpiTopName">—</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-icon">🚩</div>
+        <div class="kpi-value" id="kpiFlags" style="color:var(--green)">0</div>
+        <div class="kpi-label">Total Flag Terkumpul</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-icon">⏱</div>
+        <div class="kpi-value" id="kpiUptime" style="color:var(--orange)">0m</div>
+        <div class="kpi-label">Durasi Sesi</div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header">
+          <span>🏅</span>
+          <h2>LEADERBOARD REAL-TIME</h2>
+          <span id="lastSyncBadge" style="margin-left:auto;font-size:.7rem;color:var(--muted)"></span>
+        </div>
+        <div class="card-body" style="padding:0">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:50px">#</th>
+                <th>Pemain</th>
+                <th style="width:80px;text-align:right">Skor</th>
+                <th style="width:160px;text-align:center">Flag</th>
+              </tr>
+            </thead>
+            <tbody id="leaderboardBody">
+              <tr>
+                <td colspan="4" style="text-align:center;color:var(--muted);padding:30px">Menunggu data...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="card">
+          <div class="card-header"><span>📋</span>
+            <h2>INFO SESI</h2>
+          </div>
+          <div class="card-body">
+            <div class="session-info" id="sessionInfo">
+              <div class="info-row"><span class="info-label">Sesi</span><span class="info-value" id="siName">—</span>
+              </div>
+              <div class="info-row"><span class="info-label">Status Firebase</span><span class="info-value"
+                  id="siStatus">—</span></div>
+              <div class="info-row"><span class="info-label">Sync Terakhir</span><span class="info-value"
+                  id="siSync">—</span></div>
+              <div class="info-row"><span class="info-label">Total Pemain</span><span class="info-value"
+                  id="siPlayers">0</span></div>
+              <div class="info-row" style="border-bottom:none"><span class="info-label">Completion Rate</span><span
+                  class="info-value" id="siCompletion">0%</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><span>📊</span>
+            <h2>STATISTIK TANTANGAN</h2>
+          </div>
+          <div class="card-body" style="padding:14px">
+            <div id="challengeStats"></div>
+          </div>
+        </div>
+
+        <div class="card" style="flex:1">
+          <div class="card-header">
+            <span>📡</span>
+            <h2>ACTIVITY LOG</h2>
+            <button class="btn btn-ghost" style="margin-left:auto;font-size:.7rem;padding:4px 10px"
+              onclick="clearLog()">Clear</button>
+          </div>
+          <div class="card-body" style="padding:12px;max-height:260px;overflow-y:auto" id="activityLog">
+            <div style="color:var(--muted);font-size:.82rem;text-align:center;padding:20px">Menunggu aktivitas...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div class="modal-overlay" id="exportModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 style="font-size:1rem">📥 Export Data Sesi</h3>
+        <button class="modal-close" onclick="closeExport()">✕</button>
+      </div>
+      <div class="modal-body">
+        <pre id="exportData">Tidak ada data</pre>
+        <div style="display:flex;gap:10px;margin-top:14px">
+          <button class="btn btn-primary" onclick="downloadCSV()">Download CSV</button>
+          <button class="btn btn-ghost" onclick="copyExport()">Copy JSON</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="resetModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 style="font-size:1rem;color:var(--red)">⚠️ Reset Sesi</h3>
+        <button class="modal-close"
+          onclick="document.getElementById('resetModal').classList.remove('active')">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="color:var(--muted);margin-bottom:16px">Aksi ini akan menghapus semua data pemain dan skor. Tidak dapat
+          dibatalkan!</p>
+        <input type="password" id="resetPw" placeholder="Password admin..." style="margin-bottom:10px">
+        <div style="display:flex;gap:10px">
+          <button class="btn btn-danger" onclick="doReset()">YA, RESET SEKARANG</button>
+          <button class="btn btn-ghost"
+            onclick="document.getElementById('resetModal').classList.remove('active')">Batal</button>
+        </div>
+        <div id="resetErr" class="err-msg"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const ADMIN_PW_HASH = 'ctf@admin2026';
+    const SESSION_NAME = 'Sesi-1';
+    const CHALLENGE_NAMES = ['Pengetahuan', 'Caesar Cipher', 'Base64', 'Steganografi', 'SQL Injection', 'Port HTTPS'];
+    const MAX_SCORE = 150;
+    const AUTH_STORAGE_KEY = 'bytearena.instructor.auth';
+    const AUTH_TTL_MS = 12 * 60 * 60 * 1000;
+    const UNIX_TS_THRESHOLD = 1000000000;
+    const FIREBASE_CONFIG = {
+      apiKey: "AIzaSyC4qfTd2to8tQY7OYRGX1nFo20hzERRgx8",
+      authDomain: "bytearena-e54d1.firebaseapp.com",
+      databaseURL: "https://bytearena-e54d1-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "bytearena-e54d1",
+      storageBucket: "bytearena-e54d1.firebasestorage.app",
+      messagingSenderId: "660200169609",
+      appId: "1:660200169609:web:e50340cf04d42e6c812658",
+      measurementId: "G-25XY1TGMF5"
+    };
+
+    let db = null;
+    let sessionName = SESSION_NAME;
+    let players = {};
+    let sessionStartTs = Date.now();
+    let sessionStartRaw = null;
+    let lastSyncRaw = null;
+    let listenersStarted = false;
+    let clockStarted = false;
+    let playerSnapshotReady = false;
+    let logItems = [];
+
+    function saveInstructorAuth() {
+      try {
+        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({
+          session: sessionName,
+          expiresAt: Date.now() + AUTH_TTL_MS
+        }));
+      } catch { }
+    }
+
+    function hasSavedInstructorAuth() {
+      try {
+        const raw = localStorage.getItem(AUTH_STORAGE_KEY);
+        if (!raw) return false;
+        const data = JSON.parse(raw);
+        if (data.session !== sessionName || data.expiresAt <= Date.now()) {
+          clearInstructorAuth();
+          return false;
+        }
+        return true;
+      } catch {
+        clearInstructorAuth();
+        return false;
+      }
+    }
+
+    function clearInstructorAuth() {
+      try {
+        localStorage.removeItem(AUTH_STORAGE_KEY);
+      } catch { }
+    }
+
+    function showDashboard() {
+      document.getElementById('loginOverlay').style.display = 'none';
+      document.getElementById('mainHeader').style.display = 'flex';
+      document.getElementById('dashMain').style.display = 'grid';
+      document.getElementById('siName').textContent = sessionName;
+      document.getElementById('sessionLabel').textContent = `Sesi: ${sessionName}`;
+      document.getElementById('siStatus').textContent = '⏳ Menghubungkan...';
+      // renderChallengeStats() dihapus dari sini
+      startClock();
+    }
+
+    function login() {
+      const pw = document.getElementById('adminPw').value;
+      if (pw !== ADMIN_PW_HASH) {
+        document.getElementById('loginErr').textContent = 'Password salah!';
+        return;
+      }
+
+      document.getElementById('loginErr').textContent = '';
+      if (!initFirebase()) return;
+      saveInstructorAuth();
+      showDashboard();
+    }
+
+    function logout() {
+      clearInstructorAuth();
+      location.reload();
+    }
+
+    document.getElementById('adminPw').addEventListener('keydown', e => {
+      if (e.key === 'Enter') login();
+    });
+
+    function initFirebase() {
+      try {
+        let app;
+        try {
+          app = firebase.app();
+        } catch {
+          app = firebase.initializeApp(FIREBASE_CONFIG);
+        }
+
+        db = firebase.database(app);
+
+        if (!listenersStarted) {
+          startListening();
+          listenersStarted = true;
+        }
+
+        return true;
+      } catch (e) {
+        document.getElementById('loginErr').textContent = 'Gagal inisialisasi Firebase: ' + e.message;
+        return false;
+      }
+    }
+
+    function syncSessionClock() {
+      if (sessionStartRaw == null) return;
+
+      if (sessionStartRaw > UNIX_TS_THRESHOLD) {
+        sessionStartTs = sessionStartRaw * 1000;
+        return;
+      }
+
+      if (lastSyncRaw != null) {
+        const elapsed = Math.max(0, lastSyncRaw - sessionStartRaw);
+        sessionStartTs = Date.now() - elapsed * 1000;
+      }
+    }
+
+    function formatSyncTime(ts) {
+      if (ts > UNIX_TS_THRESHOLD) {
+        return new Date(ts * 1000).toLocaleTimeString('id-ID');
+      }
+
+      const min = Math.floor(ts / 60);
+      const sec = Math.floor(ts % 60);
+      return `ESP +${min}m ${sec}s`;
+    }
+
+    function startListening() {
+      const ref = db.ref(`/sessions/${sessionName}/players`);
+
+      ref.on('value', snap => {
+        const data = snap.val() || {};
+        const prev = JSON.parse(JSON.stringify(players)); // snapshot sebelumnya
+        players = data;
+
+        updateBadge(true);
+        renderLeaderboard();
+        updateKPIs();
+        renderChallengeStats(); // ← pindahkan ke sini agar selalu pakai data terbaru
+        if (playerSnapshotReady) {
+          detectChanges(prev, data);
+        } else {
+          playerSnapshotReady = true;
+        }
+        updateSessionInfo();
+      });
+
+      db.ref(`/sessions/${sessionName}/info`).on('value', snap => {
+        const info = snap.val();
+        if (info && info.startTime) {
+          sessionStartRaw = Number(info.startTime);
+          syncSessionClock();
+        }
+      });
+
+      db.ref(`/sessions/${sessionName}/lastSync`).on('value', snap => {
+        const ts = Number(snap.val());
+        if (ts) {
+          lastSyncRaw = ts;
+          syncSessionClock();
+          const label = formatSyncTime(ts);
+          document.getElementById('siSync').textContent = label;
+          document.getElementById('lastSyncBadge').textContent = `Sync: ${label}`;
+        }
+      });
+
+      db.ref('.info/connected').on('value', snap => {
+        const connected = !!snap.val();
+        updateBadge(connected);
+        document.getElementById('siStatus').textContent = connected ? '✅ Terhubung' : '❌ Terputus';
+      });
+    }
+
+    function updateBadge(ok) {
+      const b = document.getElementById('connBadge');
+      b.textContent = ok ? '🟢 Firebase Live' : '🔴 Offline';
+      b.className = 'badge ' + (ok ? 'badge-live' : 'badge-offline');
+    }
+
+    function renderLeaderboard() {
+      const sorted = Object.entries(players)
+        .map(([name, d]) => ({
+          name,
+          score: d.score || 0,
+          solved: d.solved || '',
+          ip: d.ip || '',
+          active: d.active !== false
+        }))
+        .sort((a, b) => b.score - a.score);
+
+      const tbody = document.getElementById('leaderboardBody');
+      if (!sorted.length) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:30px">Menunggu data...</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = sorted.map((p, i) => {
+        const rankHtml = i < 3
+          ? `<span class="rank-badge r${i + 1}">${['🥇', '🥈', '🥉'][i]}</span>`
+          : `<span class="rank-badge rn">#${i + 1}</span>`;
+
+        const pct = Math.min(100, (p.score / MAX_SCORE) * 100);
+        const pills = Array.from({ length: 6 }, (_, k) =>
+          `<span class="flag-pill ${p.solved[k] === '1' ? 'flag-done' : 'flag-todo'}" title="Ch ${k + 1}">${k + 1}</span>`
+        ).join('');
+
+        const rowStyle = p.active ? '' : 'opacity: 0.5; filter: grayscale(0.5);';
+        const activeTag = p.active ? '' : ' <span style="font-size:0.6rem; color:var(--red); border:1px solid var(--red); padding:1px 4px; border-radius:4px; margin-left:4px">OFFLINE</span>';
+
+        return `<tr style="${rowStyle}">
+      <td>${rankHtml}</td>
+      <td>
+        <div style="font-weight:600">${esc(p.name)}${activeTag}</div>
+        <div style="font-size:.7rem;color:var(--muted)">${esc(p.ip)}</div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+      </td>
+      <td style="text-align:right;font-weight:700;color:var(--yellow)">${p.score}</td>
+      <td style="text-align:center"><div class="flag-pills" style="justify-content:center">${pills}</div></td>
+    </tr>`;
+      }).join('');
+    }
+
+    function updateKPIs() {
+      const allPlayers = Object.entries(players).map(([name, data]) => ({
+        name,
+        score: data.score || 0,
+        solved: data.solved || '',
+        active: data.active !== false
+      }));
+
+      const activePlayers = allPlayers.filter(p => p.active);
+
+      document.getElementById('kpiPlayers').textContent = activePlayers.length;
+      document.getElementById('siPlayers').textContent = activePlayers.length;
+
+      // Top Score tetap diambil dari semua pemain (walaupun offline)
+      const top = allPlayers.reduce((best, current) => current.score > best.score ? current : best, { name: '—', score: 0 });
+      document.getElementById('kpiTopScore').textContent = top.score || 0;
+      document.getElementById('kpiTopName').textContent = top.name || '—';
+
+      // Total Flag dihitung dari semua pemain
+      const totalFlags = allPlayers.reduce((sum, p) => sum + p.solved.split('').filter(c => c === '1').length, 0);
+      document.getElementById('kpiFlags').textContent = totalFlags;
+
+      const maxFlags = allPlayers.length * 6;
+      const completion = maxFlags > 0 ? Math.round((totalFlags / maxFlags) * 100) : 0;
+      document.getElementById('siCompletion').textContent = `${completion}%`;
+    }
+
+    function renderChallengeStats() {
+      const container = document.getElementById('challengeStats');
+      const allPlayers = Object.values(players);
+      const totalPlayers = allPlayers.length || 1;
+
+      container.innerHTML = CHALLENGE_NAMES.map((name, i) => {
+        const solved = allPlayers.filter(p => (p.solved || '')[i] === '1').length;
+        const pct = Math.round((solved / totalPlayers) * 100);
+        return `
+      <div style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:.78rem">
+          <span style="color:var(--text)">${i + 1}. ${name}</span>
+          <span style="color:var(--muted)">${solved}/${arr.length} (${pct}%)</span>
+        </div>
+        <div class="progress-bar" style="height:6px">
+          <div class="progress-fill" style="width:${pct}%"></div>
+        </div>
+      </div>`;
+      }).join('');
+    }
+
+    function detectChanges(prev, curr) {
+      Object.keys(curr).forEach(name => {
+        if (!prev[name]) {
+          addLog(`${name} bergabung ke sesi`, 'join');
+        } else if (curr[name].active !== false && prev[name].active === false) {
+          addLog(`${name} terhubung kembali`, 'join');
+        } else if (curr[name].active === false && prev[name].active !== false) {
+          addLog(`${name} terputus (offline)`, 'fail');
+        }
+      });
+
+      Object.entries(curr).forEach(([name, data]) => {
+        const prevSolved = prev[name]?.solved || '';
+        const currSolved = data.solved || '';
+        for (let i = 0; i < 6; i++) {
+          if (currSolved[i] === '1' && prevSolved[i] !== '1') {
+            addLog(`${name} ✅ solved Challenge ${i + 1} (${CHALLENGE_NAMES[i]})`, 'success');
+          }
+        }
+      });
+    }
+
+    function addLog(msg, type = 'info') {
+      const now = new Date().toLocaleTimeString('id-ID');
+      logItems.unshift({ msg, type, time: now });
+      if (logItems.length > 50) logItems.pop();
+
+      const el = document.getElementById('activityLog');
+      const dotClass = type === 'success' ? 'log-success' : type === 'join' ? 'log-join' : 'log-fail';
+      const item = document.createElement('div');
+      item.className = 'log-item';
+      item.innerHTML = `<div class="log-dot ${dotClass}"></div><div style="flex:1">${esc(msg)}</div><div class="log-time">${now}</div>`;
+      el.insertBefore(item, el.firstChild);
+      if (el.children.length > 50) el.lastChild.remove();
+
+      const placeholder = el.querySelector('[style*="text-align:center"]');
+      if (placeholder) placeholder.remove();
+    }
+
+    function clearLog() {
+      logItems = [];
+      document.getElementById('activityLog').innerHTML =
+        '<div style="color:var(--muted);font-size:.82rem;text-align:center;padding:20px">Log bersih.</div>';
+    }
+
+    function updateSessionInfo() {
+    }
+
+    function startClock() {
+      if (clockStarted) return;
+      clockStarted = true;
+
+      const tick = () => {
+        const now = new Date();
+        document.getElementById('clockDisplay').textContent = now.toLocaleTimeString('id-ID');
+        const elapsed = Math.max(0, Math.floor((Date.now() - sessionStartTs) / 60000));
+        const kpiUptime = document.getElementById('kpiUptime');
+        if (kpiUptime) kpiUptime.textContent = elapsed + 'm';
+      };
+
+      tick();
+      setInterval(tick, 1000);
+    }
+
+    function openExport() {
+      const sorted = Object.entries(players)
+        .map(([name, d]) => ({ name, score: d.score || 0, ip: d.ip || '', solved: d.solved || '' }))
+        .sort((a, b) => b.score - a.score);
+
+      document.getElementById('exportData').textContent = JSON.stringify({
+        session: sessionName,
+        exportTime: new Date().toISOString(),
+        players: sorted
+      }, null, 2);
+
+      document.getElementById('exportModal').classList.add('active');
+    }
+
+    function closeExport() {
+      document.getElementById('exportModal').classList.remove('active');
+    }
+
+    function downloadCSV() {
+      const sorted = Object.entries(players)
+        .map(([name, d]) => ({ name, score: d.score || 0, ip: d.ip || '', solved: d.solved || '' }))
+        .sort((a, b) => b.score - a.score);
+
+      const csvCell = value => `"${String(value ?? '').replace(/"/g, '""')}"`;
+      let csv = 'Rank,Nama,Skor,IP,' + CHALLENGE_NAMES.join(',') + '\n';
+      sorted.forEach((p, i) => {
+        const flags = Array.from({ length: 6 }, (_, k) => p.solved[k] === '1' ? 'Solved' : '-');
+        csv += `${i + 1},${csvCell(p.name)},${p.score},${csvCell(p.ip)},${flags.join(',')}\n`;
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const a = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      a.href = url;
+      a.download = `CTF_${sessionName}_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function copyExport() {
+      const text = document.getElementById('exportData').textContent;
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(() => {
+          alert('JSON disalin ke clipboard!');
+        }).catch(copyExportFallback);
+        return;
+      }
+
+      copyExportFallback();
+
+      function copyExportFallback() {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        const ok = document.execCommand('copy');
+        ta.remove();
+        alert(ok ? 'JSON disalin ke clipboard!' : 'Copy gagal. Pilih teks JSON lalu salin manual.');
+      }
+    }
+
+    function confirmReset() {
+      document.getElementById('resetErr').textContent = '';
+      document.getElementById('resetPw').value = '';
+      document.getElementById('resetModal').classList.add('active');
+    }
+
+    async function doReset() {
+      const pw = document.getElementById('resetPw').value;
+      if (!pw) {
+        document.getElementById('resetErr').textContent = 'Masukkan password!';
+        return;
+      }
+      if (pw !== ADMIN_PW_HASH) {
+        document.getElementById('resetErr').textContent = 'Password admin salah!';
+        return;
+      }
+
+      try {
+        // 1. Hapus di Firebase
+        await db.ref(`/sessions/${sessionName}/players`).remove();
+        await db.ref(`/sessions/${sessionName}/lastSync`).remove();
+
+        // 2. Coba beritahu ESP32 (jika terhubung ke WiFi ByteArena)
+        try {
+          await fetch('http://192.168.4.1/api/admin/reset', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: pw })
+          });
+        } catch (err) {
+          console.warn("Gagal menghubungi ESP32 secara langsung. Pastikan Anda terhubung ke WiFi ByteArena jika ingin mereset memori ESP32 secara instan.");
+        }
+
+        players = {};
+        logItems = [];
+        renderLeaderboard();
+        updateKPIs();
+        document.getElementById('activityLog').innerHTML = '';
+        addLog('Sesi direset oleh instruktur', 'join');
+        addLog('Sesi baru dimulai', 'join');
+        document.getElementById('resetModal').classList.remove('active');
+        alert('Sesi berhasil direset!');
+      } catch (e) {
+        document.getElementById('resetErr').textContent = 'Gagal: ' + e.message;
+      }
+    }
+
+    function esc(s) {
+      return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    if (hasSavedInstructorAuth()) {
+      if (initFirebase()) showDashboard();
+    } else {
+      document.getElementById('adminPw').focus();
+    }
+  </script>
+</body>
+
+</html><!DOCTYPE html>
+<html lang="id">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>CTF-ESP32 | Instruktur Dashboard</title>
+
+  <!-- Firebase SDK v9 (compat mode) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0
+    }
+
+    :root {
+      --bg: #050d1a;
+      --surface: #0c1526;
+      --surface2: #111f36;
+      --border: #1e3a5f;
+      --accent: #00d4ff;
+      --accent2: #7c3aed;
+      --green: #10b981;
+      --red: #ef4444;
+      --yellow: #f59e0b;
+      --orange: #f97316;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --font: 'Segoe UI', system-ui, sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      min-height: 100vh
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(ellipse at top left, rgba(0, 212, 255, .06) 0%, transparent 60%),
+        radial-gradient(ellipse at bottom right, rgba(124, 58, 237, .06) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    header {
+      background: rgba(5, 13, 26, .95);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 28px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .logo {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: 1px
+    }
+
+    .logo em {
+      color: var(--accent2);
+      font-style: normal
+    }
+
+    .badge {
+      padding: 3px 12px;
+      border-radius: 20px;
+      font-size: .72rem;
+      font-weight: 600;
+      letter-spacing: .5px;
+      text-transform: uppercase;
+    }
+
+    .badge-live {
+      background: rgba(16, 185, 129, .15);
+      color: var(--green);
+      border: 1px solid rgba(16, 185, 129, .3)
+    }
+
+    .badge-offline {
+      background: rgba(239, 68, 68, .15);
+      color: var(--red);
+      border: 1px solid rgba(239, 68, 68, .3)
+    }
+
+    .header-actions {
+      margin-left: auto;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap
+    }
+
+    .btn {
+      padding: 8px 18px;
+      border-radius: 8px;
+      font-size: .82rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all .2s;
+      letter-spacing: .3px;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #000
+    }
+
+    .btn-primary:hover {
+      background: #00bcd4
+    }
+
+    .btn-danger {
+      background: rgba(239, 68, 68, .15);
+      color: var(--red);
+      border: 1px solid rgba(239, 68, 68, .3)
+    }
+
+    .btn-danger:hover {
+      background: var(--red);
+      color: #fff
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border)
+    }
+
+    .btn-ghost:hover {
+      border-color: var(--accent);
+      color: var(--accent)
+    }
+
+    main {
+      position: relative;
+      z-index: 1;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px 20px;
+      display: grid;
+      gap: 20px
+    }
+
+    #loginOverlay {
+      position: fixed;
+      inset: 0;
+      z-index: 999;
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .login-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 40px;
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+    }
+
+    .login-box h2 {
+      font-size: 1.5rem;
+      color: var(--accent);
+      margin-bottom: 8px
+    }
+
+    .login-box p {
+      color: var(--muted);
+      margin-bottom: 24px;
+      font-size: .9rem
+    }
+
+    input[type=password],
+    input[type=text] {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: .9rem;
+      outline: none;
+      margin-bottom: 12px;
+      transition: border-color .2s;
+    }
+
+    input:focus {
+      border-color: var(--accent)
+    }
+
+    .err-msg {
+      color: var(--red);
+      font-size: .8rem;
+      margin-top: 8px;
+      min-height: 18px
+    }
+
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px
+    }
+
+    @media(max-width:800px) {
+      .kpi-row {
+        grid-template-columns: repeat(2, 1fr)
+      }
+    }
+
+    .kpi {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      transition: border-color .2s;
+    }
+
+    .kpi:hover {
+      border-color: var(--accent)
+    }
+
+    .kpi-icon {
+      font-size: 1.6rem
+    }
+
+    .kpi-value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--accent)
+    }
+
+    .kpi-label {
+      font-size: .72rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1px
+    }
+
+    .kpi-delta {
+      font-size: .75rem;
+      color: var(--green)
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: 20px
+    }
+
+    @media(max-width:1000px) {
+      .grid-2 {
+        grid-template-columns: 1fr
+      }
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden
+    }
+
+    .card-header {
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface2);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .card-header h2 {
+      font-size: .9rem;
+      font-weight: 600;
+      color: var(--accent);
+      letter-spacing: .8px
+    }
+
+    .card-body {
+      padding: 20px
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .85rem
+    }
+
+    th {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--muted);
+      font-weight: 600;
+      font-size: .75rem;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+    }
+
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(30, 58, 95, .4)
+    }
+
+    tr:last-child td {
+      border-bottom: none
+    }
+
+    tr:hover td {
+      background: rgba(0, 212, 255, .03)
+    }
+
+    .rank-badge {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: .75rem;
+      font-weight: 700;
+    }
+
+    .r1 {
+      background: linear-gradient(135deg, #ffd700, #ffb300);
+      color: #000
+    }
+
+    .r2 {
+      background: linear-gradient(135deg, #c0c0c0, #a0a0a0);
+      color: #000
+    }
+
+    .r3 {
+      background: linear-gradient(135deg, #cd7f32, #b8651a);
+      color: #fff
+    }
+
+    .rn {
+      background: var(--border);
+      color: var(--muted);
+      font-size: .7rem
+    }
+
+    .progress-bar {
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      margin-top: 4px
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: 2px;
+      transition: width .6s
+    }
+
+    .flag-pills {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap
+    }
+
+    .flag-pill {
+      width: 22px;
+      height: 22px;
+      border-radius: 4px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: .65rem;
+      font-weight: 700;
+    }
+
+    .flag-done {
+      background: rgba(16, 185, 129, .2);
+      color: var(--green);
+      border: 1px solid rgba(16, 185, 129, .4)
+    }
+
+    .flag-todo {
+      background: rgba(30, 58, 95, .4);
+      color: var(--muted);
+      border: 1px solid var(--border)
+    }
+
+    .log-item {
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(30, 58, 95, .3);
+      font-size: .8rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .log-time {
+      color: var(--muted);
+      font-size: .72rem;
+      white-space: nowrap;
+      margin-top: 2px
+    }
+
+    .log-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-top: 4px
+    }
+
+    .log-success {
+      background: var(--green)
+    }
+
+    .log-fail {
+      background: var(--red)
+    }
+
+    .log-join {
+      background: var(--accent)
+    }
+
+    .chart-container {
+      position: relative;
+      height: 180px;
+      margin-top: 10px
+    }
+
+    canvas {
+      width: 100% !important
+    }
+
+    .session-info {
+      display: grid;
+      gap: 10px
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(30, 58, 95, .3);
+      font-size: .85rem;
+    }
+
+    .info-label {
+      color: var(--muted)
+    }
+
+    .info-value {
+      font-weight: 600;
+      color: var(--text)
+    }
+
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 999;
+      background: rgba(0, 0, 0, .8);
+      backdrop-filter: blur(4px);
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .modal-overlay.active {
+      display: flex
+    }
+
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      width: 100%;
+      max-width: 480px;
+      animation: mIn .2s ease;
+    }
+
+    @keyframes mIn {
+      from {
+        transform: scale(.9);
+        opacity: 0
+      }
+
+      to {
+        transform: scale(1);
+        opacity: 1
+      }
+    }
+
+    .modal-header {
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between
+    }
+
+    .modal-body {
+      padding: 20px
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 1.3rem;
+      cursor: pointer
+    }
+
+    pre {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      font-size: .75rem;
+      overflow-x: auto;
+      max-height: 300px;
+      color: var(--text);
+      white-space: pre-wrap;
+    }
+
+    @media(max-width:600px) {
+      header {
+        padding: 12px 16px
+      }
+
+      .kpi-value {
+        font-size: 1.5rem
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id="loginOverlay">
+    <div class="login-box">
+      <div style="font-size:2.5rem;margin-bottom:12px">🔐</div>
+      <h2>CTF-ESP32 Dashboard</h2>
+      <p>Masukkan password admin untuk mengakses dashboard instruktur</p>
+      <input type="password" id="adminPw" placeholder="Password Admin...">
+      <button class="btn btn-primary" style="width:100%" onclick="login()">MASUK</button>
+      <div class="err-msg" id="loginErr"></div>
+      <!-- <div style="margin-top:20px;font-size:.75rem;color:var(--muted)">
+        Default: <code style="color:var(--accent)">ctf@admin2026</code>
+      </div> -->
+    </div>
+  </div>
+
+  <header style="display:none" id="mainHeader">
+    <div class="logo">CTF<em>-</em>ESP32 <span style="font-size:.7rem;color:var(--muted)">Instruktur Dashboard</span>
+    </div>
+    <span class="badge" id="connBadge">⚪ Connecting...</span>
+    <div id="sessionLabel" style="color:var(--muted);font-size:.82rem"></div>
+    <div class="header-actions">
+      <span id="clockDisplay" style="color:var(--muted);font-size:.82rem"></span>
+      <button class="btn btn-ghost" onclick="openExport()">📥 Export CSV</button>
+      <button class="btn btn-danger" onclick="confirmReset()">🔄 Reset Sesi</button>
+      <button class="btn btn-ghost" onclick="logout()">Keluar</button>
+    </div>
+  </header>
+
+  <main id="dashMain" style="display:none">
+    <div class="kpi-row">
+      <div class="kpi">
+        <div class="kpi-icon">👥</div>
+        <div class="kpi-value" id="kpiPlayers">0</div>
+        <div class="kpi-label">Pemain Aktif</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-icon">🏆</div>
+        <div class="kpi-value" id="kpiTopScore" style="color:var(--yellow)">0</div>
+        <div class="kpi-label">Skor Tertinggi</div>
+        <div class="kpi-delta" id="kpiTopName">—</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-icon">🚩</div>
+        <div class="kpi-value" id="kpiFlags" style="color:var(--green)">0</div>
+        <div class="kpi-label">Total Flag Terkumpul</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-icon">⏱</div>
+        <div class="kpi-value" id="kpiUptime" style="color:var(--orange)">0m</div>
+        <div class="kpi-label">Durasi Sesi</div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header">
+          <span>🏅</span>
+          <h2>LEADERBOARD REAL-TIME</h2>
+          <span id="lastSyncBadge" style="margin-left:auto;font-size:.7rem;color:var(--muted)"></span>
+        </div>
+        <div class="card-body" style="padding:0">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:50px">#</th>
+                <th>Pemain</th>
+                <th style="width:80px;text-align:right">Skor</th>
+                <th style="width:160px;text-align:center">Flag</th>
+              </tr>
+            </thead>
+            <tbody id="leaderboardBody">
+              <tr>
+                <td colspan="4" style="text-align:center;color:var(--muted);padding:30px">Menunggu data...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="card">
+          <div class="card-header"><span>📋</span>
+            <h2>INFO SESI</h2>
+          </div>
+          <div class="card-body">
+            <div class="session-info" id="sessionInfo">
+              <div class="info-row"><span class="info-label">Sesi</span><span class="info-value" id="siName">—</span>
+              </div>
+              <div class="info-row"><span class="info-label">Status Firebase</span><span class="info-value"
+                  id="siStatus">—</span></div>
+              <div class="info-row"><span class="info-label">Sync Terakhir</span><span class="info-value"
+                  id="siSync">—</span></div>
+              <div class="info-row"><span class="info-label">Total Pemain</span><span class="info-value"
+                  id="siPlayers">0</span></div>
+              <div class="info-row" style="border-bottom:none"><span class="info-label">Completion Rate</span><span
+                  class="info-value" id="siCompletion">0%</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><span>📊</span>
+            <h2>STATISTIK TANTANGAN</h2>
+          </div>
+          <div class="card-body" style="padding:14px">
+            <div id="challengeStats"></div>
+          </div>
+        </div>
+
+        <div class="card" style="flex:1">
+          <div class="card-header">
+            <span>📡</span>
+            <h2>ACTIVITY LOG</h2>
+            <button class="btn btn-ghost" style="margin-left:auto;font-size:.7rem;padding:4px 10px"
+              onclick="clearLog()">Clear</button>
+          </div>
+          <div class="card-body" style="padding:12px;max-height:260px;overflow-y:auto" id="activityLog">
+            <div style="color:var(--muted);font-size:.82rem;text-align:center;padding:20px">Menunggu aktivitas...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div class="modal-overlay" id="exportModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 style="font-size:1rem">📥 Export Data Sesi</h3>
+        <button class="modal-close" onclick="closeExport()">✕</button>
+      </div>
+      <div class="modal-body">
+        <pre id="exportData">Tidak ada data</pre>
+        <div style="display:flex;gap:10px;margin-top:14px">
+          <button class="btn btn-primary" onclick="downloadCSV()">Download CSV</button>
+          <button class="btn btn-ghost" onclick="copyExport()">Copy JSON</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="resetModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 style="font-size:1rem;color:var(--red)">⚠️ Reset Sesi</h3>
+        <button class="modal-close"
+          onclick="document.getElementById('resetModal').classList.remove('active')">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="color:var(--muted);margin-bottom:16px">Aksi ini akan menghapus semua data pemain dan skor. Tidak dapat
+          dibatalkan!</p>
+        <input type="password" id="resetPw" placeholder="Password admin..." style="margin-bottom:10px">
+        <div style="display:flex;gap:10px">
+          <button class="btn btn-danger" onclick="doReset()">YA, RESET SEKARANG</button>
+          <button class="btn btn-ghost"
+            onclick="document.getElementById('resetModal').classList.remove('active')">Batal</button>
+        </div>
+        <div id="resetErr" class="err-msg"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const ADMIN_PW_HASH = 'ctf@admin2026';
+    const SESSION_NAME = 'Sesi-1';
+    const CHALLENGE_NAMES = ['Pengetahuan', 'Caesar Cipher', 'Base64', 'Steganografi', 'SQL Injection', 'Port HTTPS'];
+    const MAX_SCORE = 150;
+    const AUTH_STORAGE_KEY = 'bytearena.instructor.auth';
+    const AUTH_TTL_MS = 12 * 60 * 60 * 1000;
+    const UNIX_TS_THRESHOLD = 1000000000;
+    const FIREBASE_CONFIG = {
+      apiKey: "AIzaSyC4qfTd2to8tQY7OYRGX1nFo20hzERRgx8",
+      authDomain: "bytearena-e54d1.firebaseapp.com",
+      databaseURL: "https://bytearena-e54d1-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "bytearena-e54d1",
+      storageBucket: "bytearena-e54d1.firebasestorage.app",
+      messagingSenderId: "660200169609",
+      appId: "1:660200169609:web:e50340cf04d42e6c812658",
+      measurementId: "G-25XY1TGMF5"
+    };
+
+    let db = null;
+    let sessionName = SESSION_NAME;
+    let players = {};
+    let sessionStartTs = Date.now();
+    let sessionStartRaw = null;
+    let lastSyncRaw = null;
+    let listenersStarted = false;
+    let clockStarted = false;
+    let playerSnapshotReady = false;
+    let logItems = [];
+
+    function saveInstructorAuth() {
+      try {
+        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({
+          session: sessionName,
+          expiresAt: Date.now() + AUTH_TTL_MS
+        }));
+      } catch { }
+    }
+
+    function hasSavedInstructorAuth() {
+      try {
+        const raw = localStorage.getItem(AUTH_STORAGE_KEY);
+        if (!raw) return false;
+        const data = JSON.parse(raw);
+        if (data.session !== sessionName || data.expiresAt <= Date.now()) {
+          clearInstructorAuth();
+          return false;
+        }
+        return true;
+      } catch {
+        clearInstructorAuth();
+        return false;
+      }
+    }
+
+    function clearInstructorAuth() {
+      try {
+        localStorage.removeItem(AUTH_STORAGE_KEY);
+      } catch { }
+    }
+
+    function showDashboard() {
+      document.getElementById('loginOverlay').style.display = 'none';
+      document.getElementById('mainHeader').style.display = 'flex';
+      document.getElementById('dashMain').style.display = 'grid';
+      document.getElementById('siName').textContent = sessionName;
+      document.getElementById('sessionLabel').textContent = `Sesi: ${sessionName}`;
+      document.getElementById('siStatus').textContent = '⏳ Menghubungkan...';
+      // renderChallengeStats() dihapus dari sini
+      startClock();
+    }
+
+    function login() {
+      const pw = document.getElementById('adminPw').value;
+      if (pw !== ADMIN_PW_HASH) {
+        document.getElementById('loginErr').textContent = 'Password salah!';
+        return;
+      }
+
+      document.getElementById('loginErr').textContent = '';
+      if (!initFirebase()) return;
+      saveInstructorAuth();
+      showDashboard();
+    }
+
+    function logout() {
+      clearInstructorAuth();
+      location.reload();
+    }
+
+    document.getElementById('adminPw').addEventListener('keydown', e => {
+      if (e.key === 'Enter') login();
+    });
+
+    function initFirebase() {
+      try {
+        let app;
+        try {
+          app = firebase.app();
+        } catch {
+          app = firebase.initializeApp(FIREBASE_CONFIG);
+        }
+
+        db = firebase.database(app);
+
+        if (!listenersStarted) {
+          startListening();
+          listenersStarted = true;
+        }
+
+        return true;
+      } catch (e) {
+        document.getElementById('loginErr').textContent = 'Gagal inisialisasi Firebase: ' + e.message;
+        return false;
+      }
+    }
+
+    function syncSessionClock() {
+      if (sessionStartRaw == null) return;
+
+      if (sessionStartRaw > UNIX_TS_THRESHOLD) {
+        sessionStartTs = sessionStartRaw * 1000;
+        return;
+      }
+
+      if (lastSyncRaw != null) {
+        const elapsed = Math.max(0, lastSyncRaw - sessionStartRaw);
+        sessionStartTs = Date.now() - elapsed * 1000;
+      }
+    }
+
+    function formatSyncTime(ts) {
+      if (ts > UNIX_TS_THRESHOLD) {
+        return new Date(ts * 1000).toLocaleTimeString('id-ID');
+      }
+
+      const min = Math.floor(ts / 60);
+      const sec = Math.floor(ts % 60);
+      return `ESP +${min}m ${sec}s`;
+    }
+
+    function startListening() {
+      const ref = db.ref(`/sessions/${sessionName}/players`);
+
+      ref.on('value', snap => {
+        const data = snap.val() || {};
+        const prev = JSON.parse(JSON.stringify(players)); // snapshot sebelumnya
+        players = data;
+
+        updateBadge(true);
+        renderLeaderboard();
+        updateKPIs();
+        renderChallengeStats(); // ← pindahkan ke sini agar selalu pakai data terbaru
+        if (playerSnapshotReady) {
+          detectChanges(prev, data);
+        } else {
+          playerSnapshotReady = true;
+        }
+        updateSessionInfo();
+      });
+
+      db.ref(`/sessions/${sessionName}/info`).on('value', snap => {
+        const info = snap.val();
+        if (info && info.startTime) {
+          sessionStartRaw = Number(info.startTime);
+          syncSessionClock();
+        }
+      });
+
+      db.ref(`/sessions/${sessionName}/lastSync`).on('value', snap => {
+        const ts = Number(snap.val());
+        if (ts) {
+          lastSyncRaw = ts;
+          syncSessionClock();
+          const label = formatSyncTime(ts);
+          document.getElementById('siSync').textContent = label;
+          document.getElementById('lastSyncBadge').textContent = `Sync: ${label}`;
+        }
+      });
+
+      db.ref('.info/connected').on('value', snap => {
+        const connected = !!snap.val();
+        updateBadge(connected);
+        document.getElementById('siStatus').textContent = connected ? '✅ Terhubung' : '❌ Terputus';
+      });
+    }
+
+    function updateBadge(ok) {
+      const b = document.getElementById('connBadge');
+      b.textContent = ok ? '🟢 Firebase Live' : '🔴 Offline';
+      b.className = 'badge ' + (ok ? 'badge-live' : 'badge-offline');
+    }
+
+    function renderLeaderboard() {
+      const sorted = Object.entries(players)
+        .map(([name, d]) => ({
+          name,
+          score: d.score || 0,
+          solved: d.solved || '',
+          ip: d.ip || '',
+          active: d.active !== false
+        }))
+        .sort((a, b) => b.score - a.score);
+
+      const tbody = document.getElementById('leaderboardBody');
+      if (!sorted.length) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:30px">Menunggu data...</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = sorted.map((p, i) => {
+        const rankHtml = i < 3
+          ? `<span class="rank-badge r${i + 1}">${['🥇', '🥈', '🥉'][i]}</span>`
+          : `<span class="rank-badge rn">#${i + 1}</span>`;
+
+        const pct = Math.min(100, (p.score / MAX_SCORE) * 100);
+        const pills = Array.from({ length: 6 }, (_, k) =>
+          `<span class="flag-pill ${p.solved[k] === '1' ? 'flag-done' : 'flag-todo'}" title="Ch ${k + 1}">${k + 1}</span>`
+        ).join('');
+
+        const rowStyle = p.active ? '' : 'opacity: 0.5; filter: grayscale(0.5);';
+        const activeTag = p.active ? '' : ' <span style="font-size:0.6rem; color:var(--red); border:1px solid var(--red); padding:1px 4px; border-radius:4px; margin-left:4px">OFFLINE</span>';
+
+        return `<tr style="${rowStyle}">
+      <td>${rankHtml}</td>
+      <td>
+        <div style="font-weight:600">${esc(p.name)}${activeTag}</div>
+        <div style="font-size:.7rem;color:var(--muted)">${esc(p.ip)}</div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+      </td>
+      <td style="text-align:right;font-weight:700;color:var(--yellow)">${p.score}</td>
+      <td style="text-align:center"><div class="flag-pills" style="justify-content:center">${pills}</div></td>
+    </tr>`;
+      }).join('');
+    }
+
+    function updateKPIs() {
+      const allPlayers = Object.entries(players).map(([name, data]) => ({
+        name,
+        score: data.score || 0,
+        solved: data.solved || '',
+        active: data.active !== false
+      }));
+
+      const activePlayers = allPlayers.filter(p => p.active);
+
+      document.getElementById('kpiPlayers').textContent = activePlayers.length;
+      document.getElementById('siPlayers').textContent = activePlayers.length;
+
+      // Top Score tetap diambil dari semua pemain (walaupun offline)
+      const top = allPlayers.reduce((best, current) => current.score > best.score ? current : best, { name: '—', score: 0 });
+      document.getElementById('kpiTopScore').textContent = top.score || 0;
+      document.getElementById('kpiTopName').textContent = top.name || '—';
+
+      // Total Flag dihitung dari semua pemain
+      const totalFlags = allPlayers.reduce((sum, p) => sum + p.solved.split('').filter(c => c === '1').length, 0);
+      document.getElementById('kpiFlags').textContent = totalFlags;
+
+      const maxFlags = allPlayers.length * 6;
+      const completion = maxFlags > 0 ? Math.round((totalFlags / maxFlags) * 100) : 0;
+      document.getElementById('siCompletion').textContent = `${completion}%`;
+    }
+
+    function renderChallengeStats() {
+      const container = document.getElementById('challengeStats');
+      const allPlayers = Object.values(players);
+      const totalPlayers = allPlayers.length || 1;
+
+      container.innerHTML = CHALLENGE_NAMES.map((name, i) => {
+        const solved = allPlayers.filter(p => (p.solved || '')[i] === '1').length;
+        const pct = Math.round((solved / totalPlayers) * 100);
+        return `
+      <div style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:.78rem">
+          <span style="color:var(--text)">${i + 1}. ${name}</span>
+          <span style="color:var(--muted)">${solved}/${arr.length} (${pct}%)</span>
+        </div>
+        <div class="progress-bar" style="height:6px">
+          <div class="progress-fill" style="width:${pct}%"></div>
+        </div>
+      </div>`;
+      }).join('');
+    }
+
+    function detectChanges(prev, curr) {
+      Object.keys(curr).forEach(name => {
+        if (!prev[name]) {
+          addLog(`${name} bergabung ke sesi`, 'join');
+        } else if (curr[name].active !== false && prev[name].active === false) {
+          addLog(`${name} terhubung kembali`, 'join');
+        } else if (curr[name].active === false && prev[name].active !== false) {
+          addLog(`${name} terputus (offline)`, 'fail');
+        }
+      });
+
+      Object.entries(curr).forEach(([name, data]) => {
+        const prevSolved = prev[name]?.solved || '';
+        const currSolved = data.solved || '';
+        for (let i = 0; i < 6; i++) {
+          if (currSolved[i] === '1' && prevSolved[i] !== '1') {
+            addLog(`${name} ✅ solved Challenge ${i + 1} (${CHALLENGE_NAMES[i]})`, 'success');
+          }
+        }
+      });
+    }
+
+    function addLog(msg, type = 'info') {
+      const now = new Date().toLocaleTimeString('id-ID');
+      logItems.unshift({ msg, type, time: now });
+      if (logItems.length > 50) logItems.pop();
+
+      const el = document.getElementById('activityLog');
+      const dotClass = type === 'success' ? 'log-success' : type === 'join' ? 'log-join' : 'log-fail';
+      const item = document.createElement('div');
+      item.className = 'log-item';
+      item.innerHTML = `<div class="log-dot ${dotClass}"></div><div style="flex:1">${esc(msg)}</div><div class="log-time">${now}</div>`;
+      el.insertBefore(item, el.firstChild);
+      if (el.children.length > 50) el.lastChild.remove();
+
+      const placeholder = el.querySelector('[style*="text-align:center"]');
+      if (placeholder) placeholder.remove();
+    }
+
+    function clearLog() {
+      logItems = [];
+      document.getElementById('activityLog').innerHTML =
+        '<div style="color:var(--muted);font-size:.82rem;text-align:center;padding:20px">Log bersih.</div>';
+    }
+
+    function updateSessionInfo() {
+    }
+
+    function startClock() {
+      if (clockStarted) return;
+      clockStarted = true;
+
+      const tick = () => {
+        const now = new Date();
+        document.getElementById('clockDisplay').textContent = now.toLocaleTimeString('id-ID');
+        const elapsed = Math.max(0, Math.floor((Date.now() - sessionStartTs) / 60000));
+        const kpiUptime = document.getElementById('kpiUptime');
+        if (kpiUptime) kpiUptime.textContent = elapsed + 'm';
+      };
+
+      tick();
+      setInterval(tick, 1000);
+    }
+
+    function openExport() {
+      const sorted = Object.entries(players)
+        .map(([name, d]) => ({ name, score: d.score || 0, ip: d.ip || '', solved: d.solved || '' }))
+        .sort((a, b) => b.score - a.score);
+
+      document.getElementById('exportData').textContent = JSON.stringify({
+        session: sessionName,
+        exportTime: new Date().toISOString(),
+        players: sorted
+      }, null, 2);
+
+      document.getElementById('exportModal').classList.add('active');
+    }
+
+    function closeExport() {
+      document.getElementById('exportModal').classList.remove('active');
+    }
+
+    function downloadCSV() {
+      const sorted = Object.entries(players)
+        .map(([name, d]) => ({ name, score: d.score || 0, ip: d.ip || '', solved: d.solved || '' }))
+        .sort((a, b) => b.score - a.score);
+
+      const csvCell = value => `"${String(value ?? '').replace(/"/g, '""')}"`;
+      let csv = 'Rank,Nama,Skor,IP,' + CHALLENGE_NAMES.join(',') + '\n';
+      sorted.forEach((p, i) => {
+        const flags = Array.from({ length: 6 }, (_, k) => p.solved[k] === '1' ? 'Solved' : '-');
+        csv += `${i + 1},${csvCell(p.name)},${p.score},${csvCell(p.ip)},${flags.join(',')}\n`;
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const a = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      a.href = url;
+      a.download = `CTF_${sessionName}_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function copyExport() {
+      const text = document.getElementById('exportData').textContent;
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(() => {
+          alert('JSON disalin ke clipboard!');
+        }).catch(copyExportFallback);
+        return;
+      }
+
+      copyExportFallback();
+
+      function copyExportFallback() {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        const ok = document.execCommand('copy');
+        ta.remove();
+        alert(ok ? 'JSON disalin ke clipboard!' : 'Copy gagal. Pilih teks JSON lalu salin manual.');
+      }
+    }
+
+    function confirmReset() {
+      document.getElementById('resetErr').textContent = '';
+      document.getElementById('resetPw').value = '';
+      document.getElementById('resetModal').classList.add('active');
+    }
+
+    async function doReset() {
+      const pw = document.getElementById('resetPw').value;
+      if (!pw) {
+        document.getElementById('resetErr').textContent = 'Masukkan password!';
+        return;
+      }
+      if (pw !== ADMIN_PW_HASH) {
+        document.getElementById('resetErr').textContent = 'Password admin salah!';
+        return;
+      }
+
+      try {
+        // 1. Hapus di Firebase
+        await db.ref(`/sessions/${sessionName}/players`).remove();
+        await db.ref(`/sessions/${sessionName}/lastSync`).remove();
+
+        // 2. Coba beritahu ESP32 (jika terhubung ke WiFi ByteArena)
+        try {
+          await fetch('http://192.168.4.1/api/admin/reset', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: pw })
+          });
+        } catch (err) {
+          console.warn("Gagal menghubungi ESP32 secara langsung. Pastikan Anda terhubung ke WiFi ByteArena jika ingin mereset memori ESP32 secara instan.");
+        }
+
+        players = {};
+        logItems = [];
+        renderLeaderboard();
+        updateKPIs();
+        document.getElementById('activityLog').innerHTML = '';
+        addLog('Sesi direset oleh instruktur', 'join');
+        addLog('Sesi baru dimulai', 'join');
+        document.getElementById('resetModal').classList.remove('active');
+        alert('Sesi berhasil direset!');
       } catch (e) {
         document.getElementById('resetErr').textContent = 'Gagal: ' + e.message;
       }
